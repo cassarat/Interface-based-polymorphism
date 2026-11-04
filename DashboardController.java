@@ -8,85 +8,75 @@ public class DashboardController {
         this.model = model;
         this.view = view;
         inicializarEventos();
-        // Carga inicial automatica en la tabla
-        this.view.actualizarTabla(this.model.obtenerWidgets());
+        refrescarVistaTarjetas(this.model.obtenerWidgets());
     }
 
     private void inicializarEventos() {
-        // listar todos los widgets
+        // enlista todos los widgets
         view.getBtnListar().addActionListener(e -> {
-            view.actualizarTabla(model.obtenerWidgets());
-            view.mostrarDetalle("Mostrando catalogo completo (" + model.obtenerWidgets().size() + " widgets activos).");
+            refrescarVistaTarjetas(model.obtenerWidgets());
+            view.mostrarDetalle("Mostrando catálogo completo (" + model.obtenerWidgets().size() + " widgets activos).");
         });
 
-        //ordenar por consumo de memoria (KB)
+        // ordena por consumo de memoria (KB) 
         view.getBtnOrdenar().addActionListener(e -> {
             model.ordenarPorMemoria();
-            view.actualizarTabla(model.obtenerWidgets());
-            view.mostrarDetalle("Widgets ordenados ascendentemente por consumo de memoria (KB).");
+            refrescarVistaTarjetas(model.obtenerWidgets());
+            view.mostrarDetalle("Widgets ordenados de menor a mayor consumo de memoria (KB).");
         });
 
-        //buscar por ID o Nombre (Sobrecarga)
+        // busca por ID o Nombre que es sobrecarga
         view.getBtnBuscar().addActionListener(e -> ejecutarBusqueda());
+    }
 
-        // ejecutar interaccion polimorfica segura
-        view.getBtnInteractuar().addActionListener(e -> ejecutarInteraccion());
+    private void refrescarVistaTarjetas(List<Widget> lista) {
+        view.actualizarTarjetas(lista, this::manejarClicEnTarjeta);
+    }
+
+    private void manejarClicEnTarjeta(Widget w) {
+        if (w instanceof Interactivo) {
+            Interactivo interactivo = (Interactivo) w;
+            String resClic = interactivo.manejarClic();
+            String resActualización = interactivo.actualizarTiempoReal();
+            
+            refrescarVistaTarjetas(model.obtenerWidgets()); // Re-renderiza cambios en tiempo real
+            view.mostrarDetalle("INTERACCIÓN EXITOSA [" + w.getNombre() + "]:\n" +
+                    "• Acción Clic: " + resClic + "\n" +
+                    "• Actualización: " + resActualización + "\n" +
+                    "• Detalles: " + w.obtenerDetallesConfiguracion());
+        } else {
+            view.mostrarDetalle("ELEMENTO ESTÁTICO [" + w.getNombre() + "]:\n" +
+                    "• Este widget no soporta la interfaz Interactivo. El sistema iteró sobre él de forma segura sin colapsar.\n" +
+                    "• Detalles: " + w.obtenerDetallesConfiguracion());
+        }
     }
 
     private void ejecutarBusqueda() {
         String criterio = view.getTextoBusqueda().trim();
         if (criterio.isEmpty()) {
-            view.mostrarError("Por favor ingrese un ID o nombre para buscar");
+            view.mostrarError("Por favor ingrese un ID o nombre para buscar.");
             return;
         }
 
-        // intenta busqueda por ID exacto
+        // Búsqueda por ID exacto sobrecarga1 
         Widget hallado = model.buscarWidget(criterio);
         if (hallado != null) {
-            view.actualizarTabla(List.of(hallado));
-            view.mostrarDetalle("BUSQUEDA POR ID EXACTO:\n" + hallado.obtenerDetallesConfiguracion());
+            refrescarVistaTarjetas(List.of(hallado));
+            view.mostrarDetalle("BÚSQUEDA POR ID EXACTO:\n" + hallado.obtenerDetallesConfiguracion());
             return;
         }
 
-        // intenta busqueda por coincidencia de nombre
+        // Búsqueda por coincidencia de nombre sobrecarga2
         List<Widget> coincidencias = model.buscarWidget(criterio, true);
         if (!coincidencias.isEmpty()) {
-            view.actualizarTabla(coincidencias);
+            refrescarVistaTarjetas(coincidencias);
             StringBuilder sb = new StringBuilder("COINCIDENCIAS POR NOMBRE (" + coincidencias.size() + "):\n");
             for (Widget w : coincidencias) {
-                sb.append("- ").append(w.obtenerDetallesConfiguracion()).append("\n");
+                sb.append("• ").append(w.obtenerDetallesConfiguracion()).append("\n");
             }
             view.mostrarDetalle(sb.toString());
         } else {
             view.mostrarError("No se encontraron widgets que coincidan con: " + criterio);
-        }
-    }
-
-    private void ejecutarInteraccion() {
-        int filaSeleccionada = view.getTablaWidgets().getSelectedRow();
-        if (filaSeleccionada == -1) {
-            view.mostrarError("Seleccione un widget de la tabla para probar la interaccion.");
-            return;
-        }
-
-        String id = (String) view.getTablaWidgets().getValueAt(filaSeleccionada, 0);
-        Widget w = model.buscarWidget(id);
-
-        if (w != null) {
-            // Verificacion polimorfica segura del tipo de interfaz
-            if (w instanceof Interactivo) {
-                Interactivo interactivo = (Interactivo) w;
-                String resClic = interactivo.manejarClic();
-                String resActualizacion = interactivo.actualizarTiempoReal();
-                view.mostrarDetalle("INTERACCION EXITOSA (" + w.getNombre() + "):\n" +
-                        "1. Accion Clic: " + resClic + "\n" +
-                        "2. Actualizacion: " + resActualizacion);
-                view.actualizarTabla(model.obtenerWidgets());
-            } else {
-                view.mostrarDetalle("ELEMENTO ESTATICO (" + w.getNombre() + "):\n" +
-                        "Este widget es de tipo estatico y no soporta la interfaz Interactivo" +
-                        "El sistema reproducio sobre el de forma segura sin colapsar.");
-            }
         }
     }
 }
